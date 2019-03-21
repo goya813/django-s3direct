@@ -3,7 +3,6 @@ import createHash from 'sha.js';
 import Evaporate from 'evaporate';
 import SparkMD5 from 'spark-md5';
 
-import './css/bootstrap.css';
 import './css/styles.css';
 
 const request = (method, url, data, headers, el, cb) => {
