@@ -270,26 +270,17 @@ const checkFileAndInitiateUpload = async event => {
         break;
       default:
         error(element, 'Sorry, could not get upload URL.');
-    }
-  });
-};
 
-const removeUpload = e => {
-  e.preventDefault();
-  const el = e.target.parentElement;
-  el.querySelector('.file-url').value = '';
-  el.querySelector('.file-input').value = '';
-  el.className = 's3direct form-active';
+    }
+  }
 };
 
 const addHandlers = el => {
-  const url = el.querySelector('.file-url');
+  const value = el.querySelector('.file-value');
   const input = el.querySelector('.file-input');
-  const remove = el.querySelector('.file-remove');
-  const status = url.value === '' ? 'form' : 'link';
+  const status = value.value === '' ? 'form' : 'link';
 
   el.className = 's3direct ' + status + '-active';
-  remove.addEventListener('click', removeUpload, false);
   input.addEventListener('change', checkFileAndInitiateUpload, false);
 };
 
