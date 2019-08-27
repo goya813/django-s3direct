@@ -13,7 +13,6 @@
 }
 
 .s3direct .progress,
-.s3direct .file-link,
 .s3direct .file-remove,
 .s3direct .file-input {
   display: none;
@@ -22,7 +21,6 @@
 }
 
 .s3direct.progress-active .progress,
-.s3direct.link-active .file-link,
 .s3direct.link-active .file-remove,
 .s3direct.form-active .file-input {
   display: block;
