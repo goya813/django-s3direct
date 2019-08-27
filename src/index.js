@@ -87,7 +87,9 @@ const beginUpload = element => {
 const finishUpload = (element, endpoint, bucket, objectKey) => {
   const fileList = element.querySelector('.file-list');
   const value = element.querySelector('.file-value');
-  fileList.innerHTML += `<p><a class="file-link" target="_blank" href="${endpoint + '/' + bucket + '/' + objectKey}">${objectKey}</a></p>`;
+  const url = endpoint + '/' + bucket + '/' + objectKey;
+  const fileName = parseNameFromUrl(url).split('/').pop()
+  fileList.innerHTML += `<p><a class="file-link" target="_blank" href="${url}">${fileName}</a></p>`;
 
   if (value.value === '') {
     value.value += endpoint + '/' + bucket + '/' + objectKey;
