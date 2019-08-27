@@ -1,3 +1,4 @@
+import 'regenerator-runtime/runtime'
 import Cookies from 'js-cookie';
 import createHash from 'sha.js';
 import Evaporate from 'evaporate';
@@ -222,25 +223,30 @@ const initiateUpload = async (element, signingUrl, uploadParameters, file, dest)
 
 const checkFileAndInitiateUpload = async event => {
   const element = event.target.parentElement;
-  const file = element.querySelector('.file-input').files[0];
+  const files = element.querySelector('.file-input').files;
   const dest = element.querySelector('.file-dest').value;
   const keyArgs = element.querySelector('.file-key_args').value;
   const destCheckUrl = element.getAttribute('data-policy-url');
   const signerUrl = element.getAttribute('data-signing-url');
-  const form = new FormData();
   const headers = { 'X-CSRFToken': getCsrfToken(element) };
 
-  form.append('dest', dest);
-  form.append('keyArgs', keyArgs);
-  form.append('name', file.name);
-  form.append('type', file.type);
-  form.append('size', file.size);
+  uploadedImgCount = 0;
+  uploadImgNum = files.length;
+  updateProgressUploadedCount(element, uploadedImgCount, uploadedImgCount);
 
-  request('POST', destCheckUrl, form, headers, element, (status, response) => {
-    const uploadParameters = parseJson(response);
-    switch (status) {
+  for (let i = 0; i < files.length; i++) {
+    const form = new FormData();
+    form.append('dest', dest);
+    form.append('keyArgs', keyArgs);
+    form.append('name', files[i].name);
+    form.append('type', files[i].type);
+    form.append('size', files[i].size);
+
+    const res = await request('POST', destCheckUrl, form, headers, element);
+    const uploadParameters = parseJson(res.body);
+    switch (res.status) {
       case 200:
-        initiateUpload(element, signerUrl, uploadParameters, file, dest);
+        await initiateUpload(element, signerUrl, uploadParameters, files[i], dest);
         break;
       case 400:
       case 403:
