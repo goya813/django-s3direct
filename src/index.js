@@ -7,6 +7,8 @@ import SparkMD5 from 'spark-md5';
 import './css/bootstrap.css';
 import './css/styles.css';
 
+let uploadedImgCount = -1;
+let uploadImgNum = -1;
 
 const request = (method, url, data, headers, el) => {
   return new Promise((resolve, reject) => {
@@ -44,6 +46,10 @@ const parseJson = json => {
   return data;
 };
 
+const updateProgressUploadedCount = (element, count, max) => {
+  element.querySelector('.file-uploaded-num').innerHTML = `${count} / ${max} uploaded`;
+};
+
 const updateProgressBar = (element, progressRatio) => {
   const bar = element.querySelector('.bar');
   bar.style.width = Math.round(progressRatio * 100) + '%';
@@ -79,16 +85,23 @@ const beginUpload = element => {
 };
 
 const finishUpload = (element, endpoint, bucket, objectKey) => {
-  const link = element.querySelector('.file-link');
-  const url = element.querySelector('.file-url');
-  url.value = endpoint + '/' + bucket + '/' + objectKey;
-  link.setAttribute('href', url.value);
-  link.innerHTML = parseNameFromUrl(url.value)
-    .split('/')
-    .pop();
+  const fileList = element.querySelector('.file-list');
+  const value = element.querySelector('.file-value');
+  fileList.innerHTML += `<p><a class="file-link" target="_blank" href="${endpoint + '/' + bucket + '/' + objectKey}">${objectKey}</a></p>`;
+
+  if (value.value === '') {
+    value.value += endpoint + '/' + bucket + '/' + objectKey;
+  }
+  else {
+    value.value += ',' + endpoint + '/' + bucket + '/' + objectKey;
+  }
+
   element.className = 's3direct link-active';
   element.querySelector('.bar').style.width = '0%';
   disableSubmit(false);
+
+  uploadedImgCount++;
+  updateProgressUploadedCount(element, uploadedImgCount, uploadedImgCount);
 };
 
 const computeMd5 = data => {
