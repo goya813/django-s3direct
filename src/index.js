@@ -6,24 +6,27 @@ import SparkMD5 from 'spark-md5';
 import './css/bootstrap.css';
 import './css/styles.css';
 
-const request = (method, url, data, headers, el, cb) => {
-  let req = new XMLHttpRequest();
-  req.open(method, url, true);
 
-  Object.keys(headers).forEach(key => {
-    req.setRequestHeader(key, headers[key]);
-  });
+const request = (method, url, data, headers, el) => {
+  return new Promise((resolve, reject) => {
+    let req = new XMLHttpRequest();
+    req.open(method, url, true);
 
-  req.onload = () => {
-    cb(req.status, req.responseText);
-  };
+    Object.keys(headers).forEach(key => {
+      req.setRequestHeader(key, headers[key]);
+    });
 
-  req.onerror = req.onabort = () => {
-    disableSubmit(false);
-    error(el, 'Sorry, failed to upload file.');
-  };
+    req.onload = () => {
+      resolve({status: req.status, body: req.responseText});
+    };
 
-  req.send(data);
+    req.onerror = req.onabort = () => {
+      disableSubmit(false);
+      error(el, 'Sorry, failed to upload file.');
+    };
+
+    req.send(data);
+  })
 };
 
 const parseNameFromUrl = url => {
@@ -121,40 +124,37 @@ const generateAmzCommonHeaders = sessionToken => {
 };
 
 const generateCustomAuthMethod = (element, signingUrl, dest) => {
-  const getAwsV4Signature = (
+  const getAwsV4Signature = async (
     _signParams,
     _signHeaders,
     stringToSign,
     signatureDateTime,
     _canonicalRequest
   ) => {
-    return new Promise((resolve, reject) => {
-      const form = new FormData();
-      const headers = { 'X-CSRFToken': getCsrfToken(element) };
+    const form = new FormData();
+    const headers = { 'X-CSRFToken': getCsrfToken(element) };
 
-      form.append('to_sign', stringToSign);
-      form.append('datetime', signatureDateTime);
-      form.append('dest', dest);
+    form.append('to_sign', stringToSign);
+    form.append('datetime', signatureDateTime);
+    form.append('dest', dest);
 
-      request('POST', signingUrl, form, headers, element, (status, resp) => {
-        const response = parseJson(resp);
-        switch (status) {
-          case 200:
-            resolve(response.s3ObjKey);
-            break;
-          case 403:
-          default:
-            reject(response.error);
-            break;
-        }
-      });
-    });
+    const res = await request('POST', signingUrl, form, headers, element)
+    const body = parseJson(res.body);
+    switch (res.status) {
+      case 200:
+        return Promise.resolve(body.s3ObjKey);
+        break;
+      case 403:
+      default:
+        return Promise.reject(body.error);
+        break;
+    }
   };
 
   return getAwsV4Signature;
 };
 
-const initiateUpload = (element, signingUrl, uploadParameters, file, dest) => {
+const initiateUpload = async (element, signingUrl, uploadParameters, file, dest) => {
   const createConfig = {
     customAuthMethod: generateCustomAuthMethod(element, signingUrl, dest),
     aws_key: uploadParameters.access_key_id,
@@ -176,9 +176,9 @@ const initiateUpload = (element, signingUrl, uploadParameters, file, dest) => {
     contentType: file.type,
     xAmzHeadersCommon: generateAmzCommonHeaders(uploadParameters.session_token),
     xAmzHeadersAtInitiate: generateAmzInitHeaders(
-      uploadParameters.acl,
-      uploadParameters.server_side_encryption,
-      uploadParameters.session_token
+        uploadParameters.acl,
+        uploadParameters.server_side_encryption,
+        uploadParameters.session_token
     ),
     progress: (progressRatio, stats) => {
       updateProgressBar(element, progressRatio);
@@ -199,29 +199,28 @@ const initiateUpload = (element, signingUrl, uploadParameters, file, dest) => {
   if (uploadParameters.content_disposition) {
     optHeaders['Content-Disposition'] = uploadParameters.content_disposition;
   }
-
   addConfig['notSignedHeadersAtInitiate'] = optHeaders;
 
-  Evaporate.create(createConfig).then(evaporate => {
-    beginUpload(element);
+  const evaporate = await Evaporate.create(createConfig);
+  beginUpload(element);
 
-    evaporate.add(addConfig).then(
+  return evaporate.add(addConfig).then(
       s3Objkey => {
         finishUpload(
-          element,
-          uploadParameters.endpoint,
-          uploadParameters.bucket,
-          s3Objkey
+            element,
+            uploadParameters.endpoint,
+            uploadParameters.bucket,
+            s3Objkey
         );
+        Promise.resolve();
       },
       reason => {
         return error(element, reason);
       }
-    );
-  });
+  )
 };
 
-const checkFileAndInitiateUpload = event => {
+const checkFileAndInitiateUpload = async event => {
   const element = event.target.parentElement;
   const file = element.querySelector('.file-input').files[0];
   const dest = element.querySelector('.file-dest').value;
