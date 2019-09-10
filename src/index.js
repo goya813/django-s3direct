@@ -103,7 +103,7 @@ const finishUpload = (element, endpoint, bucket, objectKey) => {
   disableSubmit(false);
 
   uploadedImgCount++;
-  updateProgressUploadedCount(element, uploadedImgCount, uploadedImgCount);
+  updateProgressUploadedCount(element, uploadedImgCount, uploadImgNum);
 };
 
 const computeMd5 = data => {
