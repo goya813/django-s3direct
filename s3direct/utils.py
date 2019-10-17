@@ -9,6 +9,7 @@ from django.conf import settings
 # AWS settings are set to None. This optional ability requires botocore,
 # however dependency on botocore is not enforced as this a secondary
 # method for retrieving credentials.
+import boto3
 try:
     from botocore.credentials import (InstanceMetadataProvider,
                                       InstanceMetadataFetcher)
@@ -74,21 +75,6 @@ def get_key(key, file_name, dest, overridden_key_args=None):
 
 
 def get_aws_credentials():
-    access_key = getattr(settings, 'AWS_ACCESS_KEY_ID', None)
-    secret_key = getattr(settings, 'AWS_SECRET_ACCESS_KEY', None)
-    if access_key and secret_key:
-        # AWS tokens are not created for pregenerated access keys
-        return AWSCredentials(None, secret_key, access_key)
-
-    if not InstanceMetadataProvider or not InstanceMetadataFetcher:
-        # AWS credentials are not required for publicly-writable buckets
-        return AWSCredentials(None, None, None)
-
-    provider = InstanceMetadataProvider(
-        iam_role_fetcher=InstanceMetadataFetcher(timeout=1000, num_attempts=2))
-    creds = provider.load()
-    if creds:
-        return AWSCredentials(creds.token, creds.secret_key, creds.access_key)
-    else:
-        # Creds are incorrect
-        return AWSCredentials(None, None, None)
+    credentials = boto3.Session().get_credentials().get_frozen_credentials()
+    if credentials.access_key and credentials.secret_key:
+        return AWSCredentials(credentials.token, credentials.secret_key, credentials.access_key)
