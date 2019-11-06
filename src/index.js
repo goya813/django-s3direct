@@ -230,9 +230,10 @@ const initiateUpload = async (element, signingUrl, uploadParameters, file, dest)
             uploadParameters.bucket,
             s3Objkey
         );
-        Promise.resolve();
+        return Promise.resolve();
       },
       reason => {
+        console.log('upload error');
         error(element, reason);
         return Promise.reject();
       }
