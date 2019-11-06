@@ -100,10 +100,12 @@ const finishUpload = (element, endpoint, bucket, objectKey) => {
 
   element.className = 's3direct link-active';
   element.querySelector('.bar').style.width = '0%';
-  disableSubmit(false);
 
   uploadedImgCount++;
   updateProgressUploadedCount(element, uploadedImgCount, uploadImgNum);
+  if (uploadedImgCount === uploadImgNum) {
+    disableSubmit(false);
+  }
 };
 
 const computeMd5 = data => {
@@ -231,7 +233,8 @@ const initiateUpload = async (element, signingUrl, uploadParameters, file, dest)
         Promise.resolve();
       },
       reason => {
-        return error(element, reason);
+        error(element, reason);
+        return Promise.reject();
       }
   )
 };
@@ -249,7 +252,8 @@ const checkFileAndInitiateUpload = async event => {
   uploadImgNum = files.length;
   updateProgressUploadedCount(element, uploadedImgCount, uploadedImgCount);
 
-  for (let i = 0; i < files.length; i++) {
+  let i = 0;
+  while (i < files.length) {
     const form = new FormData();
     form.append('dest', dest);
     form.append('keyArgs', keyArgs);
@@ -261,7 +265,12 @@ const checkFileAndInitiateUpload = async event => {
     const uploadParameters = parseJson(res.body);
     switch (res.status) {
       case 200:
-        await initiateUpload(element, signerUrl, uploadParameters, files[i], dest);
+        try {
+          await initiateUpload(element, signerUrl, uploadParameters, files[i], dest);
+          i++;
+        } catch {
+          console.log('Uploading Error, retry');
+        }
         break;
       case 400:
       case 403:
