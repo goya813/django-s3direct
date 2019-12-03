@@ -20,7 +20,7 @@ setup(
     url=package['homepage'],
     packages=['s3direct'],
     include_package_data=True,
-    install_requires=['django>=1.8'],
+    install_requires=['django>=1.8,<=2.2.7'],
     zip_safe=False,
     classifiers=[
         'Development Status :: 4 - Beta',
