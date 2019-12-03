@@ -37,8 +37,7 @@ class S3DirectWidget(widgets.TextInput):
                 })
 
         ctx = {
-            'policy_url': reverse('s3direct'),
-            'signing_url': reverse('s3direct-signing'),
+            'presigned_url_endpoint': reverse('presigned-url'),
             'dest': self.dest,
             'name': name,
             'csrf_cookie_name': csrf_cookie_name,

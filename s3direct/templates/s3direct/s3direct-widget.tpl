@@ -1,4 +1,4 @@
-<div class="s3direct" data-policy-url="{{ policy_url }}" data-signing-url="{{ signing_url }}">
+<div class="s3direct" get-presigned-url-endpoint="{{ presigned_url_endpoint }}" >
   <div class="file-uploaded-num"></div>
   <div class="file-list">
     {% for file in files %}

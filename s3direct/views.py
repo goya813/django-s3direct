@@ -1,5 +1,4 @@
 import json
-from datetime import datetime
 from django.conf import settings
 from django.http import (HttpResponse, HttpResponseBadRequest,
                          HttpResponseForbidden, HttpResponseNotFound,
@@ -10,13 +9,12 @@ try:
     from urllib.parse import unquote
 except ImportError:
     from urlparse import unquote
-from .utils import (get_aws_credentials, get_aws_v4_signature,
-                    get_aws_v4_signing_key, get_s3direct_destinations, get_key)
+from .utils import get_s3direct_destinations, get_key, get_s3_presigned_post
 
 
 @csrf_protect
 @require_POST
-def get_upload_params(request):
+def get_presigned_url(request):
     """Authorises user and validates given file properties."""
     file_name = request.POST['name']
     file_type = request.POST['type']
@@ -79,59 +77,17 @@ def get_upload_params(request):
         resp = json.dumps({'error': 'AWS credentials config missing.'})
         return HttpResponseServerError(resp, content_type='application/json')
 
-    upload_data = {
-        'object_key': get_key(key, file_name, dest, key_args),
-        'access_key_id': aws_credentials.access_key,
-        'session_token': aws_credentials.token,
-        'region': region,
+    object_key = get_key(key, file_name, dest, key_args)
+    acl = dest.get('acl') or 'public_read'
+    presigned_post = get_s3_presigned_post(bucket, object_key, acl, region, file_type)
+
+    content = {
+        'url': presigned_post['url'],
+        'fields': presigned_post['fields'],
+        'object_key': object_key,
         'bucket': bucket,
-        'endpoint': endpoint,
-        'acl': dest.get('acl') or 'public-read',
-        'allow_existence_optimization': dest.get('allow_existence_optimization', False)
+        'endpoint': endpoint
     }
 
-    optional_params = [
-        'content_disposition', 'cache_control', 'server_side_encryption'
-    ]
-
-    for optional_param in optional_params:
-        if optional_param in dest:
-            option = dest.get(optional_param)
-            if hasattr(option, '__call__'):
-                upload_data[optional_param] = option(file_name)
-            else:
-                upload_data[optional_param] = option
-
-    resp = json.dumps(upload_data)
-    return HttpResponse(resp, content_type='application/json')
-
-
-@csrf_protect
-@require_POST
-def generate_aws_v4_signature(request):
-    message = unquote(request.POST['to_sign'])
-    dest = get_s3direct_destinations().get(unquote(request.POST['dest']))
-    signing_date = datetime.strptime(request.POST['datetime'],
-                                     '%Y%m%dT%H%M%SZ')
-
-    auth = dest.get('auth')
-    if auth and not auth(request.user):
-        resp = json.dumps({'error': 'Permission denied.'})
-        return HttpResponseForbidden(resp, content_type='application/json')
-
-    region = getattr(settings, 'AWS_S3_REGION_NAME', None)
-    if not region:
-        resp = json.dumps({'error': 'S3 region config missing.'})
-        return HttpResponseServerError(resp, content_type='application/json')
-
-    aws_credentials = get_aws_credentials()
-    if not aws_credentials.secret_key or not aws_credentials.access_key:
-        resp = json.dumps({'error': 'AWS credentials config missing.'})
-        return HttpResponseServerError(resp, content_type='application/json')
-
-    signing_key = get_aws_v4_signing_key(aws_credentials.secret_key,
-                                         signing_date, region, 's3')
-
-    signature = get_aws_v4_signature(signing_key, message)
-    resp = json.dumps({'s3ObjKey': signature})
+    resp = json.dumps(content)
     return HttpResponse(resp, content_type='application/json')
