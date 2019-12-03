@@ -72,11 +72,6 @@ def get_presigned_url(request):
         resp = json.dumps({'error': 'S3 endpoint config missing.'})
         return HttpResponseServerError(resp, content_type='application/json')
 
-    aws_credentials = get_aws_credentials()
-    if not aws_credentials.secret_key or not aws_credentials.access_key:
-        resp = json.dumps({'error': 'AWS credentials config missing.'})
-        return HttpResponseServerError(resp, content_type='application/json')
-
     object_key = get_key(key, file_name, dest, key_args)
     acl = dest.get('acl') or 'public_read'
     presigned_post = get_s3_presigned_post(bucket, object_key, acl, region, file_type)
