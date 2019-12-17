@@ -1,13 +1,9 @@
 import 'regenerator-runtime/runtime'
 import Cookies from 'js-cookie';
-const axios = require('axios');
+import axios from 'axios';
 
 import './css/bootstrap.css';
 import './css/styles.css';
-
-let uploadedImgCount = -1;
-let uploadImgNum = -1;
-let concurrentUploads = 0;
 
 const updateProgressUploadedCount = (element, count, max) => {
   element.querySelector('.file-uploaded-num').innerHTML = `${count} / ${max} uploaded`;
@@ -24,7 +20,6 @@ const error = (el, msg) => {
   alert(msg);
 };
 
-
 const disableSubmit = status => {
   const submitRow = document.querySelector('.submit-row');
   if (!submitRow) return;
@@ -33,20 +28,21 @@ const disableSubmit = status => {
     'input[type=submit],button[type=submit]'
   );
 
-  if (status === true) concurrentUploads++;
-  else concurrentUploads--;
-
   [].forEach.call(buttons, el => {
-    el.disabled = concurrentUploads !== 0;
+    el.disabled = status;
   });
 };
 
-const beginUpload = element => {
+const beginUploads = element => {
   disableSubmit(true);
   element.className = 's3direct progress-active';
 };
 
-const finishUpload = (element, endpoint, bucket, objectKey, fileName) => {
+const endUploads = element => {
+  disableSubmit(false);
+};
+
+const uploadedFile = (element, endpoint, bucket, objectKey, fileName) => {
   const fileList = element.querySelector('.file-list');
   const value = element.querySelector('.file-value');
   const url = endpoint + '/' + bucket + '/' + objectKey;
@@ -61,12 +57,6 @@ const finishUpload = (element, endpoint, bucket, objectKey, fileName) => {
 
   element.className = 's3direct link-active';
   element.querySelector('.bar').style.width = '0%';
-
-  uploadedImgCount++;
-  updateProgressUploadedCount(element, uploadedImgCount, uploadImgNum);
-  if (uploadedImgCount === uploadImgNum) {
-    disableSubmit(false);
-  }
 };
 
 const getCsrfToken = element => {
@@ -92,13 +82,6 @@ async function uploadFileToS3(element, uploadParameters, file, dest) {
     }
   });
 
-  finishUpload(
-    element,
-    uploadParameters.endpoint,
-    uploadParameters.bucket,
-    uploadParameters.object_key,
-    file.name
-  );
   return Promise.resolve();
 }
 
@@ -109,15 +92,12 @@ const checkFileAndInitiateUpload = async event => {
   const keyArgs = element.querySelector('.file-key_args').value;
   const presignedUrlEnpoint= element.getAttribute('get-presigned-url-endpoint');
   const headers = { 'X-CSRFToken': getCsrfToken(element) };
-  console.log(presignedUrlEnpoint);
 
-  uploadedImgCount = 0;
-  uploadImgNum = files.length;
-  beginUpload(element);
-  updateProgressUploadedCount(element, uploadedImgCount, uploadedImgCount);
+  const fileNum = files.length;
+  beginUploads(element);
+  updateProgressUploadedCount(element, 0, fileNum);
 
-  let i = 0;
-  while (i < files.length) {
+  for (let i = 0; i < files.length; i++) {
     console.log(files[i].name);
     const form = new FormData();
     form.append('dest', dest);
@@ -129,12 +109,17 @@ const checkFileAndInitiateUpload = async event => {
     const res = await axios({method: 'post', url: presignedUrlEnpoint, data: form, headers});
     switch (res.status) {
       case 200:
-        try {
-          await uploadFileToS3(element, res.data, files[i], dest);
-          i++;
-        } catch(e) {
-          console.log(e);
-          console.log('Uploading Error, retry');
+        while (true) {
+          try {
+            await uploadFileToS3(element, res.data, files[i], dest);
+
+            uploadedFile(element, res.data.endpoint, res.data.bucket, res.data.object_key, files[i].name);
+            updateProgressUploadedCount(element, i + 1, fileNum);
+            break;
+          } catch(e) {
+            console.log(e);
+            console.log('Uploading Error, retry');
+          }
         }
         break;
       case 400:
@@ -147,6 +132,8 @@ const checkFileAndInitiateUpload = async event => {
 
     }
   }
+
+  endUploads(element);
 };
 
 const addHandlers = el => {
